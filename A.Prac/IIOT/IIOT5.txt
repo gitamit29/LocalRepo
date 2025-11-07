@@ -1,0 +1,139 @@
+#include <Servo.h>
+#include <LiquidCrystal.h>
+
+// --------- Hardware config ----------
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+Servo myservo;
+
+const int ServoM   = 7;   // Connected to the servo motor (use separate power supply for servo)
+const int ExitPin  = 9;   // Pin connected to the EXIT sensor
+const int InPin    = 8;   // Pin connected to the IN sensor
+const int Pwr      = 6;   // Optional: provide +V to sensors from this pin (if used)
+const int Gnd      = 10;  // Optional: provide GND to sensors from this pin (if used)
+
+const int BarLow   = 90;   // Closed position
+const int BarUp    = 177;  // Open position
+const int CAPACITY = 24;   // Parking lot capacity
+
+// If your sensors output HIGH when triggered set this true.
+// If they output LOW when triggered (common with sensors that need pull-up), set to false.
+const bool SENSOR_ACTIVE_HIGH = true;
+
+// ---------- state ----------
+int Available = CAPACITY;
+
+// previous states for edge detection
+bool prevInState = false;
+bool prevExitState = false;
+
+void setup() {
+  myservo.attach(ServoM);
+  lcd.begin(16, 2);
+
+  // welcome/title
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("BatStateU Parking");
+  delay(1500);
+
+  // optional sensor supply pins (only if you actually want to power sensors from Arduino pins)
+  pinMode(Gnd, OUTPUT);
+  pinMode(Pwr, OUTPUT);
+  digitalWrite(Gnd, LOW);
+  digitalWrite(Pwr, HIGH);
+
+  // sensor pinMode depending on sensor logic
+  if (SENSOR_ACTIVE_HIGH) {
+    pinMode(ExitPin, INPUT);
+    pinMode(InPin, INPUT);
+  } else {
+    // use internal pull-ups for sensors that pull LOW when active
+    pinMode(ExitPin, INPUT_PULLUP);
+    pinMode(InPin, INPUT_PULLUP);
+  }
+
+  // init servo to closed (down)
+  myservo.write(BarLow);
+  delay(1000);
+
+  // initialize previous states
+  prevInState = readSensor(InPin);
+  prevExitState = readSensor(ExitPin);
+}
+
+void showAvailability() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+
+  if (Available <= 0) {
+    lcd.print("Sorry");
+    lcd.setCursor(0, 1);
+    lcd.print("No Place left!");
+  } else if (Available == 1) {
+    lcd.print("Space left for");
+    lcd.setCursor(0, 1);
+    lcd.print("1 car");
+  } else {
+    lcd.print("Space left:");
+    lcd.setCursor(0, 1);
+    lcd.print(Available);
+    lcd.print(" cars");
+  }
+}
+
+// helper to read a sensor and convert according to SENSOR_ACTIVE_HIGH
+bool readSensor(int pin) {
+  int val = digitalRead(pin);
+  // if active high, true means triggered. If active low, triggered when reading LOW.
+  return (SENSOR_ACTIVE_HIGH) ? (val == HIGH) : (val == LOW);
+}
+
+void openBarrierForMs(unsigned long ms) {
+  myservo.write(BarUp);
+  unsigned long start = millis();
+  while (millis() - start < ms) {
+    // allow checks to continue (optional small delay)
+    delay(10);
+  }
+  myservo.write(BarLow);
+  delay(150); // small post-close settle
+}
+
+void loop() {
+  // update display occasionally (not necessary every cycle)
+  showAvailability();
+
+  // read current sensor states (converted to boolean triggered/not)
+  bool inState   = readSensor(InPin);
+  bool exitState = readSensor(ExitPin);
+
+  // Detect rising edge (not previously triggered -> now triggered)
+  if (inState && !prevInState) {
+    // vehicle entering
+    if (Available > 0) {
+      Available--;
+      openBarrierForMs(3000); // open for 3 seconds
+    } else {
+      // optional: you can flash LCD or buzzer to indicate full
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Parking Full");
+      delay(800);
+    }
+  }
+
+  if (exitState && !prevExitState) {
+    // vehicle exiting
+    if (Available < CAPACITY) {
+      Available++;
+      openBarrierForMs(3000);
+    }
+  }
+
+  // update previous states for next loop
+  prevInState = inState;
+  prevExitState = exitState;
+
+  // small loop delay to avoid bouncing issues; actual detection uses edge logic
+  delay(80);
+}

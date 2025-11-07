@@ -1,0 +1,71 @@
+#include <LiquidCrystal.h>
+
+// LCD pins: (rs, enable, d4, d5, d6, d7)
+// NOTE: don't use these same pins elsewhere
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+int V_GasSen = 0;
+float V_TempSens = 0.0;
+
+const int buzzerPin = 7;
+const int gasLedPin = 9;
+const int tempLedPin = 8; // moved from 12 to 8 (12 is used by LCD)
+
+void setup() {
+  // analog pins don't need pinMode but harmless to set as input
+  pinMode(A0, INPUT); // Gas sensor analog pin
+  pinMode(A1, INPUT); // Temperature sensor analog pin
+
+  pinMode(buzzerPin, OUTPUT); // Buzzer
+  pinMode(gasLedPin, OUTPUT);  // Gas LED
+  pinMode(tempLedPin, OUTPUT); // Temp LED
+
+  lcd.begin(16, 2); // Initialize the LCD (16x2)
+}
+
+void loop() {
+  // Read gas sensor (raw ADC 0-1023)
+  V_GasSen = analogRead(A0);
+
+  // Read temperature sensor and calculate temperature
+  // Keep formula you had but force float math
+  V_TempSens = -40.0 + 0.488155 * ( (float)analogRead(A1) - 20.0 );
+
+  // Default display: first line temperature, second line gas value
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temperature: ");
+  lcd.print(V_TempSens, 1); // show 1 decimal place
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Gas: ");
+  lcd.print(V_GasSen);
+
+  // Gas alert
+  if (V_GasSen >= 250) {
+    tone(buzzerPin, 523, 1000); // play tone for 1 second
+    digitalWrite(gasLedPin, HIGH);
+    // show alert message briefly
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ALERT: Gas Detected");
+    delay(1200);
+  } else {
+    digitalWrite(gasLedPin, LOW);
+  }
+
+  // Temperature alert
+  if (V_TempSens >= 70.0) {
+    tone(buzzerPin, 523, 1000);
+    digitalWrite(tempLedPin, HIGH);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ALERT: High Temp!");
+    delay(1200);
+  } else {
+    digitalWrite(tempLedPin, LOW);
+  }
+
+  delay(500); // small pause before next loop
+}

@@ -1,0 +1,64 @@
+const int pirPin = 2;   // PIR OUT -> D2
+const int ledPin = 13;  // built-in LED
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(pirPin, INPUT);    // try INPUT first
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  Serial.println("Debug start: waiting 30s for PIR warm-up...");
+  delay(30000);
+  Serial.println("Ready. Reading PIR pin...");
+}
+
+int lastState = -1;
+void loop() {
+  int state = digitalRead(pirPin);
+  Serial.print("digitalRead: ");
+  Serial.print(state);
+
+  // Optional analog check if you moved OUT to an analog pin (A0) for extra info:
+  // int a = analogRead(A0);
+  // Serial.print("  analogRead(A0): "); Serial.print(a);
+
+  if (state != lastState) {
+    Serial.print("  <-- changed from ");
+    Serial.print(lastState);
+    Serial.print(" to ");
+    Serial.print(state);
+    Serial.println();
+    digitalWrite(ledPin, state ? HIGH : LOW);
+    lastState = state;
+  } else {
+    Serial.println();
+  }
+
+  delay(250);
+}
+
+
+
+
+
+.....................................................................................
+
+
+const int pirPin = 2;  // signal from PIR
+const int ledPin = 13; // LED connected here
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int motion = digitalRead(pirPin);
+  if (motion == HIGH) {
+    digitalWrite(ledPin, HIGH);
+    Serial.println("Motion detected!");
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+  delay(10);
+}
